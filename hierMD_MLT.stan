@@ -2,8 +2,9 @@
 // Copyright (C) 2020, Michael L. Thompson
 // CONTACT VIA: https://www.linkedin.com/in/mlthomps
 //
-// Adapted from the Stan code in R script "VB_stan_hierMD.R", 
-// which included the following:
+// Adapted from Azzimonti & Corani 
+// ["Hierarchical BN parameter estimation"](https://ipg.idsia.ch/software.php?id=139)
+// from their R script "VB_stan_hierMD.R", which included the following:
 //    IPG - IDSIA
 //    Authors: L. Azzimonti, G. Corani
 //    Reference: "Hierarchical estimation of parameters in Bayesian networks",
