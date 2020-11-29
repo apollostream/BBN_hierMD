@@ -1,0 +1,849 @@
+---
+title: "Experiments with Hierarchical Multinomial Dirichlet Priors for the Conditional Probability Tables of Discrete Bayesian Networks"
+author: "Michael L. Thompson"
+date: "11/23/2020"
+output: 
+  pdf_document:
+    toc: yes
+    toc_depth: 4
+linkcolor: red
+urlcolor: blue
+bibliography: references.bibtex
+link-citations: true
+---
+
+```{r setup, include=FALSE}
+COMPUTATION <- TRUE
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 8,
+  fig.height = 5
+)
+```
+
+\newpage
+
+## Introduction
+
+This is a brief experiment with Hierarchical Multinomial-Dirichlet priors for Conditional Probability Tables (CPTs) of discrete Bayesian Networks (i.e., Bayesian belief networks, BBN).
+
+I demonstrate the following two approaches:
+
+1.  **`hierMD`** -- The base case proposed by L. Azzimonti, G. Corani, and M. Zaffalon (*ACZ*) of [Imprecise Probability Group \@ IDSIA](https://ipg.idsia.ch/) [@AZZIMONTI201967]. \
+2.  **`hierMDmix`** -- A mixture model of parent states that I've proposed.    
+   + (**Note:** Originally, I'd posed the mixture on the Dirichlet parameter vectors. But now, I pose the mixture on conditional probability table columns -- see the math below.  Haven't done enough testing to determine which is better, but the current choice seems more reasonable. )
+
+**My Conclusions** (w/out having done any other testing than what's shown below):
+
+-   It's unclear whether the more complicated mixture model gives Bayesian inference results that are much different than those of the *ACZ* model.    
+-   In the resulting inferences for sparse data cases, both approaches are an improvement over a flat prior -- the traditional `BDeu` (*Bayesian Dirichlet equivalent uniform* or *Laplace smoothing*) approach, in that they yield conditional distributions that are closer to the child node's marginal distribution than are uniform distributions from `BDeu`. These less flat distributions often seem more plausible.    
+-   Given that both approaches are in the Multinomial-Dirichlet family of posterior distributions, it probably is fairly straight forward to approximate the expectation of the posteriors using analytical formulas, esp. for `hierMD`. Even for `hierMDmix`, I think the mixture component weights could be estimated in proportion to the Kullback-Leibler Divergence of each parent state's smoothed estimate of the conditional probability vector from that of the marginal distribution of the child node averaged over the parent states marginal distributions. Or some such Information-Theory-based weighting....
+
+
+## Generative Models
+
+Let:
+
+* Each child node $X$, with $L_X$ states that are indexed $x_i = 1,\dots, L_X$, have $P \geq 1$ parent nodes $Y_1, ..., Y_P$.     
+* Each parent of $X$ be denoted $Y_j$ have $L_{Y_j}$ states that are indexed $y_j = 1, \dots, L_{Y_j}$.     
+* All possible combinations of the parent states be indexed by $y = 1, \dots, (L_{Y_i} \times \dots \times L_{Y_P})$.    
+* Additionally, the $L_X$ probability parameters that make up the conditional probability vector over the states of the child node given the $y$ combination of parent states is denoted by $\boldsymbol{\theta}_{X|Y=y}$.      
+* Similarly, the vector of data counts over the states of the child node given the $y$ combination of parent states is denoted by $\mathbf{n}_{X|Y=y}$.  
+
+Then, we have the following models.
+
+
+### Hierarchical Multinomial-Dirichlet, `hierMD`
+
+
+$$
+\begin{aligned}
+\boldsymbol{\alpha} &\sim \mathrm{Dirichlet}(\mathbf{1}_{L_X}) \\
+s &\sim \mathrm{Student}\text{-}\mathrm{t}_{+}(\nu=4,\mu=1,\sigma=1)\\
+\text{For each combination of states, }y&\text{, of all parents},\\
+\forall y \in 1, \dots, &(L_{Y_1}\times \dots \times L_{Y_P}): \\
+\boldsymbol{\alpha}_y &= s \times \boldsymbol{\alpha} \\
+\boldsymbol{\theta}_{X|Y=y} &\sim \mathrm{Dirichlet(\boldsymbol{\alpha}_y)}  \\
+\mathbf{n}_{X|Y=y} &\sim \mathrm{Multinomial}(\boldsymbol{\theta}_{X|Y=y},N_{X|Y=y}) \\
+\forall i \in 1,\dots, &L_X: \\
+\boldsymbol{\theta}_{X|Y=y} &= \{\theta_{X=x_i|Y=y}\}   \\
+\mathbf{n}_{X|Y=y} &= \{n_{X=x_i|Y=y}\} \\
+N_{X|Y=y} &= \sum_{i=1}^{L_X}{n_{X=x_i|Y=y}}
+\end{aligned}
+$$
+
+
+### Hierarchical Multinomial-Dirichlet Mixture, `hierMDmix`
+
+
+$$
+\begin{aligned}
+\boldsymbol{\alpha} &\sim \mathrm{Dirichlet}(\mathbf{1}_{L_X}) \\
+s &\sim \mathrm{Student}\text{-}\mathrm{t}_{+}(\nu=4,\mu=1,\sigma=1)\\
+\mathbf{w}_X &\sim \mathrm{Dirichlet}(\mathbf{1}_{P}) \\
+\mathbf{w}_X &= \{w_{X,j}\} \forall j \in 1,\dots,P \\
+\text{For each state, }y_j\text{, of each parent,}Y_j\text{,   }\\
+\forall j \in 1,\dots, P\text{; and }&\forall y_j \in 1, \dots, L_{Y_j}: \\
+\boldsymbol{\alpha}_{Y_j=y_j} &= s \times \boldsymbol{\alpha} \\
+\boldsymbol{\theta}_{Y_j=y_j} &\sim \mathrm{Dirichlet}(\boldsymbol{\alpha}_{Y_j=y_j}) \\
+\text{For each combination of states, }y&\text{, of all parents},\\
+\forall y \in 1,\dots, &(L_{Y_1}\times \dots \times L_{Y_P}): \\
+\boldsymbol{\theta}_{X|Y=y} &= \sum_{j=1}^{P}{w_{X,j} \times \boldsymbol{\theta}_{Y_j=y_j^*}}; \\
+&\text{where }y_j^*\text{ is state of }Y_j\text{ corresponding to parent combo indexed by }y\\
+\mathbf{n}_{X|Y=y} &\sim \mathrm{Multinomial}(\boldsymbol{\theta}_{X|Y=y},N_{X|Y=y}) \\
+\forall i \in 1,\dots, &L_X: \\
+\boldsymbol{\theta}_{X|Y=y} &= \{\theta_{X=x_i|Y=y}\}   \\
+\mathbf{n}_{X|Y=y} &= \{n_{X=x_i|Y=y}\}\\
+N_{X|Y=y} &= \sum_{i=1}^{L_X}{n_{X=x_i|Y=y}}
+\end{aligned}
+$$
+
+### Comments
+
+For both models, it is instructive to look at what the posterior distribution for the conditional probability vector $\boldsymbol{\theta}_{X|Y=y}$ over child node $X$'s $L_X$ states looks like when there are either very little or no data for the combination of parent states $Y=y$, i.e., when $\mathbf{n}_{X|Y=y}$ nears or equals the zero vector. In both models, the posterior will look like the prior of $\boldsymbol{\theta}_{X|Y=y}$, which is $\mathrm{Dirichlet}(\boldsymbol{\alpha}_y)$; but the models calculate this prior's $\boldsymbol{\alpha}_y$ parameter vector differently.
+
+The `hierMD` model uses a population-level (or global) prior $\boldsymbol{\alpha}_y$ for child node $X$, which depending upon the strength of $s$ (the effective sample size of the prior), will tend towards the marginal distribution of counts for each state of $X$. That is, it will look like the proportions computed from each element of vector $\mathbf{n}_{X} \equiv \sum_{y=1}{\mathbf{n}_{X|Y=y}}$, with a bit of smoothing.
+
+On the other hand, the `hierMDmix` model uses a mixture of parent-state-level (or local) parameter vectors for child node $X$, which depending upon the strength of $s$, will tend to a $\mathbf{w}_X$-weighted mixture of the conditional distribution of counts for each state of $X$ given each state $y_j$ of each parent node $Y_j$. 
+
+**Importantly**, for child nodes $X$ with a single parent ($P=1$), `hierMD` and `hierMDmix` give the same result for $\boldsymbol{\theta}_{X|Y=y}$. (For example, node `age` in the example problem below.)
+
+Below we look at a BBN for predicting the rating of a movie given the viewer features, movie features, and past ratings, then the child node `gender`  has two parent nodes, `movie_rating` (below denoted as `Str.ctr_79`) and `occupation`.  
+
+In a sparsely measured combo of parent states like lowest level of `movie_rating` and `occupation` of `"doctor"`, the `hierMD` model will estimate a posterior distribution over the `gender` states of `"F"` and `"M"` that looks like the overall population distribution -- in this BBN's dataset, that is about 29% and 71%, respectively -- but slightly smoothed by a uniform hyperprior. 
+
+On the other hand, the `hierMDmix` model will estimate a posterior over `gender` that is a $\mathbf{w}_X$-weighted mixture of the empirical conditional probability distributions (i.e., the data proportions) of `gender` given `movie_rating` at its lowest level and of `gender` given `occupation` equal `"doctor"`, each slightly smoothed with the population-level prior.
+
+
+
+## Prepare the R Environment
+
+Here, we load the packages we need.
+
+```{r pkgs}
+library(magrittr) # I always use piping!
+library(tidyverse) # Thank heaven & Hadley Wickham for the `tidyverse`!
+library(ggridges)
+
+# Bayesian network packages
+library(bnlearn)
+library(gRain)
+# Implementation of **Stan** probabilistic programming language
+library(rstan)
+rstan_options(auto_write = TRUE)
+
+select <- dplyr::select
+
+```
+
+This section includes a hidden **R** code chunk that defines functions we need (rather than `source`-ing a script). View this R Markdown document's source to see the functions.
+
+```{r fncs, include=FALSE}
+
+# *** Function gen_CPT_hierMD ***
+gen_CPT_hierMD <- function(bbn, df, ch_name = "gender", full = FALSE,  vb_rng_seed = 42){
+  # Let's first do the "gender" node. It has 2 parents: "Str.ctr_79" and "occupation".
+  #ch_name <- "gender"
+  cpt <- bbn$cptlist[[ch_name]] # array with CPT using BDeu priors (Laplace smoothing.)
+  # Build data list for Stan program sm_hierMD
+  n_st_ch  <- dim(cpt)[[1]]
+  pr_names <- setdiff( names(dim(cpt)), ch_name )
+  df_ch_pr <- df %>%
+    count(across(all_of(c(rev(pr_names),ch_name))),.drop = FALSE) %>%
+    unite(col = "pr_combo", all_of(pr_names), sep = "#")
+  N_ch_pr <- matrix(df_ch_pr$n, nrow = n_st_ch)
+  
+  theta_BDeu1    <- t(N_ch_pr + (1/n_st_ch)) %>% divide_by(rowSums(.))
+  # These should match "cpt"
+  theta_BDeu_eps <- t(N_ch_pr + (1/length(N_ch_pr))) %>% divide_by(rowSums(.))
+  # spot-check...
+  #(cpt[,,1,drop=FALSE]) %>% round(3)
+  #theta_BDeu_eps %>% head(n_st_pr_i[[1]]) %>% t() %>% round(3)
+  #(cpt[,,15,drop=FALSE]) %>% round(3)
+  #theta_BDeu_eps[(15-1)*n_st_pr_i[[1]] + (1:n_st_pr_i[[1]]),] %>% t() %>% round(3)
+  
+  data_list_hierMD <- list(
+    n_st_ch = n_st_ch, # number of child states
+    n_st_pr = prod(dim(cpt)[-1]), # number of total combos of parent states
+    N_ch_pr = N_ch_pr, # number of cases at all combos of parents & child
+    alpha_0 = array(rep(1,n_st_ch),dim=n_st_ch) # hyperparameter for Dirichlet priors
+  )
+  
+  n_st_pr_i <- {dim(cpt)[-1]} %>% array(dim=length(.))
+  data_list_hierMDmix <- c(
+    data_list_hierMD,
+    list(
+      n_parent  = length(pr_names), # number of parents
+      n_st_pr_i = n_st_pr_i, # number of states for each parent
+      # state of each parent for each combo of parents:
+      i_st_pr   = as.matrix(expand.grid(purrr::map(n_st_pr_i,~seq(1,.x)))) 
+    )
+  )
+  
+  # Estimate posterior of CPT for child node:
+  # 1. hierMD
+
+  sf_hierMD   <- vb( sm_hierMD, data = data_list_hierMD, seed = vb_rng_seed )
+  rslt_hierMD <- rstan::extract(sf_hierMD)
+  names(rslt_hierMD)
+  theta_hierMD <- rslt_hierMD$theta %>% apply(2:length(dim(.)),mean)
+  # 2. hierMDmix
+  sf_hierMDmix <- vb(sm_hierMDmix,data=data_list_hierMDmix,seed= vb_rng_seed)
+  rslt_hierMDmix <- rstan::extract(sf_hierMDmix)
+  names(rslt_hierMDmix)
+  theta_hierMDmix <- rslt_hierMDmix$theta %>% apply(2:length(dim(.)),mean)
+  
+  result <- list(
+    theta_BDeu1     = theta_BDeu1,
+    theta_BDeu_eps  = theta_BDeu_eps,
+    theta_hierMD    = theta_hierMD,
+    theta_hierMDmix = theta_hierMDmix
+  )
+  if(full){
+    result <- c(
+      result,
+      list(
+        rslt_hierMD    = rslt_hierMD,
+        rslt_hierMDmix = rslt_hierMDmix,
+        data_list_hierMD = data_list_hierMD,
+        data_list_hierMDmix = data_list_hierMDmix
+      )
+    )
+  }
+  invisible( result)
+}
+
+# *** FUNCTION revise_bbn ***
+# This function loads the CPT parameters estimated using the alternative
+# approaches into the original BBN
+revise_bbn <- function(bbn_list, ch_name, theta_hierMD, theta_hierMDmix){
+  bbn_hierMD <- bbn_list$hierMD
+  cpt <- bbn_hierMD$cptlist[[ch_name]]
+  bbn_hierMD$cptlist[[ch_name]] <- array(
+    t(theta_hierMD),
+    dim=dim(cpt),
+    dimnames=dimnames(cpt)
+  )
+  bbn_hierMD <- compile(bbn_hierMD)
+  # Revise BBN using CPT from hierMDmix
+  bbn_hierMDmix <- bbn_list$hierMDmix
+  cpt <- bbn_hierMDmix$cptlist[[ch_name]]
+  bbn_hierMDmix$cptlist[[ch_name]] <- array(
+    t(theta_hierMDmix),
+    dim=dim(cpt),
+    dimnames=dimnames(cpt)
+  )
+  bbn_hierMDmix <- compile(bbn_hierMDmix)
+  return( list(hierMD = bbn_hierMD, hierMDmix = bbn_hierMDmix) )
+}
+
+# *** FUNCTION gbf ***
+gbf <- function(bbn, gndr = "F",occ = "doctor",age = "yrs_33_44"){
+  # Generalized Bayes Factors: O(H|E)/O(H) -- posterior-to-prior odds-ratio
+  # (all conditioned upon Has_Seen = "yes")
+  joint <- bbn %>%
+    querygrain(
+      nodes = c("gender","occupation","age"),
+      evidence = list(Has_Seen = "yes" ),
+      type  = "joint"
+    )
+  
+  prior_odds_F_occ <- joint %>% {./(1 - .)}
+  
+  joint_post <- bbn %>%
+    querygrain(
+      nodes = c("gender","occupation","age"),
+      evidence=list(LIKE = "yes"),
+      type="joint"
+    )
+  posterior_odds_F_occ_like <-  joint_post %>% {./(1-.)}
+  
+  # H: {gender,occupation,age}, E: {like movie} (all given Has_Seen="yes")
+  GBF_HE <- posterior_odds_F_occ_like / prior_odds_F_occ
+  
+  full <- list(
+    gbf        = GBF_HE,
+    wte        = 10*log10(GBF_HE), # in decibans
+    joint      = joint,
+    joint_post = joint_post,
+    prior_odds = signif(prior_odds_F_occ,3),
+    post_odds  = signif(posterior_odds_F_occ_like,3)
+  )
+  at_cond <- lapply( full, function(x){x[age,occ,gndr]} )
+  invisible( list( at_cond = at_cond, full = full ) )
+}
+
+```
+
+## Load the Bayesian Belief Network (BBN)
+
+We'll use a BBN that I've generated before. The network is one of many in an ensemble of BBNs used to build a Movie Recommender System -- see my presentation at the [8th Annual BayesiaLab Conference (2020)](https://library.bayesia.com/articles/#!bayesialab-knowledge-hub/2020-conference-michael-thompson) and the code and PDF of the slides at this github repository, ["Bayesian Analysis"](https://github.com/apollostream/Bayesian-Analysis).
+
+The particular BBN shown here predicts the viewer's rating for the movie "Star Trek: The Motion Picture" (1979) given any combination of viewer features -- age, gender, or occupation -- movie genre, and ratings of other movies. (It was based on 694 observations in the smallest version of the [MovieLens dataset](https://grouplens.org/datasets/movielens/).)
+
+```{r loadbbn, results='hide'}
+# Get a BBN to experiment with.
+# Use it to simulate data, too.
+bbn <- loadHuginNet(
+  file = "bbn_StarTrek_79.net", 
+  description = "Predicts ratings of 'Star Trek: The Motion Picture (1979)'"
+)
+```
+
+### Visualize the BBN
+
+```{r vizbbn}
+# plot it
+g1 <- bbn$dag  %>%
+  as.bn() %>%
+  graphviz.plot( render = FALSE )
+g1 %>% 
+  plot( 
+    attrs = list(node=list(fontsize="32")), 
+    main = 'Star Trek: The Motion Picture (1979)'
+  )
+```
+
+### Perform Test Inferences
+
+Just to demonstrate some of the nature of the BBN we're experimenting with, we perform a few inferences on the base BBN.
+
+We plan on concentrating on inferences between the viewer features (`age`, `gender`, `occupation`) and the viewing (`Has_Seen`), liking (`LIKE`), and rating (`Str.ctr_79`) nodes of the BBN.
+
+```{r test_inference}
+# The movie nodes have states that are in 1-point deviations from a viewer's
+# median rating over all movies the viewer has seen. Assume dev. of zero or
+# greater means viewer liked the movie.
+movie_node <- "Str.ctr_79"
+querygrain(bbn,"Has_Seen") %>% map(round,3)
+querygrain(bbn,"LIKE") %>% map(round,3)
+querygrain(bbn,"LIKE", evidence = c(Has_Seen="yes") ) %>% map(round,3)
+querygrain(bbn,c("LIKE","Has_Seen"),type="conditional") %>% round(3)
+querygrain(bbn,nodes = c("Has_Seen","age"),type="conditional") %>% round(3)
+querygrain(
+  bbn,
+  nodes = c(movie_node,"age"), 
+  evidence = c(Has_Seen="yes"), 
+  type="conditional"
+) %>% round(3)
+```
+
+### Generate Data
+
+We'll also use the BBN to generate data that will serve as the bases for traditionally Laplace-smoothed parameter estimates and to see how sparsely the data lie in this high-dimensional discrete-variate space.
+
+```{r gen_data, eval=COMPUTATION}
+rng_seed <- 31
+N   <- 1000L
+df  <- bbn %>%
+  simulate( nsim = N, seed = rng_seed ) %>%
+  as_tibble()
+```
+
+Re-estimate the parameters of the BBN so they match this new dataset.
+
+```{r updtbbn}
+# Update the CPT parameters of the bbn
+# Note that the nodes `LIKE` and `Has_Seen` are deterministic (i.e., logical).
+cptl <- bbn$cptlist[setdiff(names(bbn$cptlist),"Str.ctr_79")] %>% 
+  map(
+  ~ {
+    names(dimnames(.x)) %>% 
+      { #print(.[[1]])
+        tb <- tabMarg( table(select(df,all_of(.))), .)
+        if(.[[1]] %in% c("LIKE","Has_Seen")){
+          smth <- 0
+        } else {
+          smth <- 1/length(tb)
+        }
+        as.parray(tb + smth)
+      } 
+  }
+)
+cptl2 <- c(
+  list(
+    Str.ctr_79= c(prop.table(table(df$Str.ctr_79)))[] %>% 
+      array( dim=length(.),dimnames=list(Str.ctr_79=names(.))) 
+  ),
+  cptl
+)
+bbn_new <- grain(compileCPT(cptl2))
+
+bbn <- bbn_new
+```
+
+## Code in the **Stan** Probabilistic Programming Language
+
+We use package `rstan`, based upon the **Stan** probabilistic programming language. Here, we show the programs, one each for the hierarchical Multinomial Dirichlet approach of *ACZ*, and the mixture variant that I propose. The code below shows how straight-forward it is to implement these approaches in **Stan**. The `hierMD` code is less than 25 lines!
+
+(Although it is possible to have `knitr` execute the code compilation directly from the **Stan** code chunks, we'll forego that and compile the programs from their respective files on disk in a later **R** code chunk.)
+
+### `hierMD` **Stan** Program
+
+This first **Stan** program is adapted from the original by *ACZ* (under the GPLv3 license) -- see ["Hierarchical BN parameter estimation"](https://ipg.idsia.ch/software.php?id=139). Here, I've copied the code from my file `hierMD_MLT.stan` without its banner comments acknowledging Azzimonti *et al.* and stating the license terms -- see my **Stan** files `hierMD_MLT.stan` and `hierMDmix_MLT.stan` for the full banners including the GPLv3 license statement.
+
+This version of *ACZ*'s approach adds a proper likelihood statement and puts a prior on the magnitude of the Dirichlet parameter, `N_prior`, which in the original code was a fixed input value `s`. I've also dropped the estimation of the posterior of the marginal probability distribution parameters for the parent states (`thetaY` in the original *ACZ* code).
+
+```{stan exmpl, output.var = "sm_dummy", eval=FALSE}
+data {
+  int<lower=2> n_st_ch; // number of child states
+  int<lower=2> n_st_pr; // number of total combos of parent states
+  int<lower=0> N_ch_pr[n_st_ch,n_st_pr]; // number of cases at all combos of parents & child
+  vector<lower=0>[n_st_ch] alpha_0; // hyperparameter for Dirichlet priors
+}
+parameters {
+  simplex[n_st_ch] theta[n_st_pr]; // conditional probability table parameters
+  simplex[n_st_ch] alpha_norm; // population-level parameter for Dirichlet priors, normalized
+  real<lower=0> N_prior; // number of cases represented by prior
+}
+transformed parameters {
+  vector<lower=0>[n_st_ch] alpha; // population-level parameter for Dirichlet priors
+  alpha = N_prior * alpha_norm;
+}
+model {
+  alpha_norm ~ dirichlet(alpha_0); // prior
+  N_prior    ~ student_t(4,1,1);   // prior
+  for (i_st_pr in 1:n_st_pr){
+    theta[i_st_pr]    ~ dirichlet( alpha ); // prior
+    N_ch_pr[,i_st_pr] ~ multinomial( theta[i_st_pr] ); // likelihood
+  }
+}
+
+```
+
+### `hierMDmix` **Stan** Program
+
+And, here's the **Stan** implementation of my mixture variant, `hierMDmix`. (See file `hierMDmix_MLT2.stan` for the full banner of acknowledgments to *ACZ* and the license terms.)
+
+```{stan exmplmix, output.var = "sm_dummymix", eval=FALSE}
+data {
+  int<lower=2> n_st_ch; // number of child states
+  int<lower=2> n_st_pr; // number of total combos of parent states
+  int<lower=0> N_ch_pr[n_st_ch,n_st_pr]; // number of cases at all combos of parents & child
+  vector<lower=0>[n_st_ch] alpha_0; // hyperparameter for Dirichlet priors
+  int <lower=1> n_parent; // number of parents
+  int <lower=2> n_st_pr_i[n_parent]; // number of states for each parent
+  int i_st_pr[n_st_pr,n_parent]; // state of each parent for each combo of parents
+}
+transformed data {
+  int n_st_pr_sum; // sum of number of states for parents
+  vector[n_parent] alpha_pr_mix; // Dirichlet parameters for mixture
+  n_st_pr_sum  = sum(n_st_pr_i);
+  alpha_pr_mix = rep_vector(1,n_parent);
+}
+parameters {
+  simplex[n_st_ch] theta_i[n_st_pr_sum];  // conditional probability table parameters
+  simplex[n_st_ch] alpha_norm; // population-level parameter for Dirichlet priors, normalized
+  real<lower=0> N_prior;  // number of cases represented by prior
+  simplex[n_parent] w_mix; // mixture probabilities on the parents alpha_i
+}
+transformed parameters {
+  vector<lower=0>[n_st_ch] theta[n_st_pr]; // mixture alpha
+  vector<lower=0>[n_st_ch] alpha; // population level
+  alpha = N_prior * alpha_norm;  // population-level
+  for( i_st in 1:n_st_pr ){
+    theta[i_st] = rep_vector(0,n_st_ch); // initialize as zeros
+    for( i in 1:n_parent ){
+      theta[i_st] += w_mix[i] * theta_i[ sum(head(n_st_pr_i,i-1)) + i_st_pr[i_st,i] ];
+    }
+  }
+}
+model {
+  alpha_norm ~ dirichlet( alpha_0 );      // prior
+  N_prior    ~ student_t( 4, 1, 1 );      // prior
+  w_mix      ~ dirichlet( alpha_pr_mix ); // prior
+  {
+    int i_st = 0;
+    for( i in 1:n_parent ){
+      for( j in 1:n_st_pr_i[i]){
+        i_st += 1;
+        theta_i[i_st] ~ dirichlet( alpha ); // prior
+      }
+    }
+  }
+  for (i_st in 1:n_st_pr){
+    N_ch_pr[,i_st] ~ multinomial( theta[i_st] );  // likelihood
+  }
+}
+
+```
+
+Now, we compile the **Stan** programs from file.
+
+```{r stan_cmpl, eval=COMPUTATION}
+# STAN COMPILATION
+# Compile the Stan programs of the two model variants.
+sm_hierMD    <- stan_model(file="hierMD_MLT.stan",    model_name="hierMD")
+sm_hierMDmix <- stan_model(file="hierMDmix_MLT2.stan", model_name="hierMDmix")
+```
+
+## Estimation of the Conditional Probability Tables (CPT)
+
+We show application of the `gen_CPT_hierMD()` function, which performs Variational Bayesian Infernce on both models to generate CPT parameters first using the `hierMD` method then the `hierMDmix` method for a single named child node. It also computes the parameters using Laplace smoothing (`BDeu`).
+
+We could do it for every child node in the BBN, but instead, we're just going to do it on the three viewer feature nodes: `gender`, `age`, and `occupation`.
+
+```{r cpt_estmtn, eval=COMPUTATION, results='hide'}
+# CPT ESTIMATION
+rslt_gender <- gen_CPT_hierMD( bbn, df, ch_name = "gender" )
+rslt_age    <- gen_CPT_hierMD( bbn, df, ch_name = "age" )
+rslt_occ    <- gen_CPT_hierMD( bbn, df, ch_name = "occupation" )
+
+rslt <- list(gender=rslt_gender, age = rslt_age, occupation = rslt_occ)
+
+# # Do All Child Nodes, excluding deterministic nodes:
+# rslt <- setdiff( bbn$universe$nodes, c(movie_node,"LIKE","Has_Seen") ) %>%
+#   set_names(.,.) %>%
+#   map( ~ {print(.x);gen_CPT_hierMD(bbn, df, ch_name = .x)} )
+```
+
+Display the CPT parameters of the `gender` node for each method.
+
+```{r theta, eval=COMPUTATION}
+# Test the gender-node revision
+theta_BDeu_eps  <- rslt_gender$theta_BDeu_eps
+theta_hierMD    <- rslt_gender$theta_hierMD
+theta_hierMDmix <- rslt_gender$theta_hierMDmix
+
+df %>% 
+  filter(str_detect(occupation,"programmer")) %$% 
+  table(gender,Str.ctr_79) %>% 
+  {list(`OCCURRENCES: occupation == "programmer"`= .)}
+
+cpt <- bbn$cptlist$gender
+n_st_pr_i <- dim(cpt)[-1]
+
+# The 15th occupation is "programmer".
+# cat("bbn cpt, original:\n")
+# (cpt[,,15,drop=FALSE]) %>% round(3)
+cat("\ntheta_BDeu_eps:\n")
+theta_BDeu_eps[(15-1)*n_st_pr_i[[1]] + (1:n_st_pr_i[[1]]),] %>% 
+  t() %>% 
+  round(3) %>%
+  {dimnames(.)<- dimnames(cpt)[-3]; .}
+cat("\ntheta_hierMD:\n")
+theta_hierMD[(15-1)*n_st_pr_i[[1]] + (1:n_st_pr_i[[1]]),] %>% 
+  t() %>% 
+  round(3) %>%
+  {dimnames(.)<- dimnames(cpt)[-3]; .}
+cat("\ntheta_hierMDmix:\n")
+theta_hierMDmix[(15-1)*n_st_pr_i[[1]] + (1:n_st_pr_i[[1]]),] %>% 
+  t() %>% 
+  round(3) %>%
+  {dimnames(.)<- dimnames(cpt)[-3]; .}
+```
+
+## Revision of the BBN
+
+Now, let's load the CPTs into separate BBN and evaluate how they differ from the original BBN in terms of inferences.
+
+```{r revbbn, eval=COMPUTATION}
+# REVISION OF BBN
+bbn_list <- list( hierMD=bbn, hierMDmix=bbn )
+for(ch_name in c("age","gender","occupation")){
+  
+  bbn_list <- revise_bbn(
+    bbn_list, 
+    ch_name         = ch_name, 
+    theta_hierMD    = rslt[[ch_name]]$theta_hierMD, 
+    theta_hierMDmix = rslt[[ch_name]]$theta_hierMDmix 
+  )
+}
+
+bbn_hierMD    <- bbn_list$hierMD
+bbn_hierMDmix <- bbn_list$hierMDmix
+```
+
+## Impact on Bayesian Inference
+
+The space is so high-dimensional, and we only have `N=1000` cases. So, most of the combos are not measured. Yet, the models will make inferences for any combination of node values.
+
+(What's actually needed is feedback to the practitioner that the network is highly uncertain about any inferences in such instances. That's where having the full posterior distributions of the CPT parameters is helpful. But, we don't explore that here.)
+
+### Visualization
+
+Let's contrast the methods by plots. Each set has a different number of data cases, $N$, from more to less to zero. (The code chunks for the latter two plots are hidden.)
+
+```{r infer01, fig.width=8,fig.height=3.5, eval=COMPUTATION}
+qdf <- list(BDeu = bbn) %>% c(bbn_list) %>%
+  imap_dfr(
+    ~  {
+      querygrain(
+        .x, nodes = c("Str.ctr_79","gender"),
+        evidence=list(Has_Seen="yes"), type="conditional"
+      ) %>% 
+        as.data.frame() %>% 
+        rownames_to_column("Rating") %>% 
+        as_tibble() %>% 
+        pivot_longer(cols=-Rating,names_to="gender", values_to="pr") %>% 
+        mutate(BBN = .y)
+    }
+  )
+qdf %>% {
+  ggplot(.,aes(x=Rating,y=pr,fill=Rating)) + 
+    geom_col() + 
+    facet_grid( gender ~ BBN, labeller = label_both) +
+    scale_fill_cyclical(values = c("#4040B0", "#9090F0")) +
+    scale_y_continuous(
+      expand = c(0, 0), limits = c(0,1),
+      labels=scales::percent
+    ) + 
+    labs(
+      x="Rating", y= "Probability",
+      title="P(Rating | Gender,\n\tHas_Seen='yes')",
+      subtitle = "Data cases, N=134"
+    ) + theme_minimal()
+} %>% print()
+
+```
+
+```{r infer02, echo=FALSE, fig.width=8,fig.height=3.5, eval=COMPUTATION}
+qdf <- list(BDeu = bbn) %>% 
+  c(bbn_list) %>%
+  imap_dfr(
+    ~  {
+      querygrain(
+        .x,
+        nodes = c("Str.ctr_79","gender"),
+        type="conditional",
+        evidence=list(occupation="programmer",Has_Seen="yes")
+      ) %>% 
+        as.data.frame() %>% 
+        rownames_to_column("Rating") %>% 
+        as_tibble() %>% 
+        pivot_longer(cols=-Rating,names_to="gender", values_to="pr") %>% 
+        mutate(BBN = .y)
+    }
+  )
+
+qdf %>% {
+  ggplot(.,aes(x=Rating,y=pr,fill=Rating)) + 
+    geom_col() + 
+    facet_grid( gender ~ BBN, labeller = label_both) +
+    scale_fill_cyclical(values = c("#4040B0", "#9090F0")) +
+    scale_y_continuous(
+      expand = c(0, 0),
+      limits = c(0,1),
+      labels=scales::percent,
+      name="Probability"
+    ) + 
+    labs(
+      x="Rating",
+      title="P(Rating | Gender,\n\tOccupation='programmer',\n\tHas_Seen='yes')",
+      subtitle = "Data cases, N=13"
+    ) +
+    theme_minimal()
+} %>%
+  print()
+
+```
+
+```{r infer03, echo=FALSE, fig.width=8,fig.height=3.5, eval=COMPUTATION}
+qdf <- list(BDeu = bbn) %>% 
+  c(bbn_list) %>%
+  imap_dfr(
+    ~  {
+      querygrain(
+        .x,
+        nodes = c("Str.ctr_79","gender"),
+        type="conditional",
+        evidence=list(occupation="doctor",Has_Seen="yes")
+      ) %>% 
+        as.data.frame() %>% 
+        rownames_to_column("Rating") %>% 
+        as_tibble() %>% 
+        pivot_longer(cols=-Rating,names_to="gender", values_to="pr") %>% 
+        mutate(BBN = .y)
+    }
+  )
+
+qdf %>% {
+  ggplot(.,aes(x=Rating,y=pr,fill=Rating)) + 
+    geom_col() + 
+    facet_grid( gender ~ BBN, labeller = label_both) +
+    scale_fill_cyclical(values = c("#4040B0", "#9090F0")) +
+    scale_y_continuous(
+      expand = c(0, 0),
+      limits = c(0,1),
+      labels=scales::percent,
+      name="Probability"
+    ) + 
+    labs(
+      x="Rating",
+      title="P(Rating | Gender,\n\tOccupation='doctor',\n\tHas_Seen='yes')",
+      subtitle = "Data cases, N=0"
+    ) +
+    theme_minimal()
+} %>%
+  print()
+
+
+```
+
+
+```{r infer1a, eval=FALSE,include=FALSE}
+# IMPACT ON BAYESIAN INFERNCE
+# Conditional ratings distribution and expected rating given gender,
+# posterior given a programmer who has seen the movie.
+ 
+# First, show occurrences:
+df %>% 
+  filter(
+    str_detect(occupation,"programmer"),
+    str_detect(Has_Seen,"yes"),
+    str_detect(age, "yrs_33_44")
+  ) %$% 
+  table(Str.ctr_79,gender) %>% 
+  {list(`OCCURRENCES: `= .)}
+
+case_profile <- list(occupation="programmer", Has_Seen = "yes", age = "yrs_33_44")
+querygrain(bbn,
+           nodes = c("Str.ctr_79","gender"), 
+           evidence = case_profile,
+           type = "conditional") %T>% {print(round(.,3))} %>% 
+  {list(Expected_Rating = round(t(.) %*% c(-3:2,0),2))}
+```
+
+```{r infer1b, eval=FALSE,include=FALSE}
+querygrain(bbn_hierMD,
+           nodes = c("Str.ctr_79","gender"), 
+           evidence = case_profile,
+           type = "conditional") %T>% {print(round(.,3))} %>% 
+  {list(Expected_Rating = round(t(.) %*% c(-3:2,0),2))}
+```
+
+```{r infer1c, eval=FALSE,include=FALSE}
+querygrain(bbn_hierMDmix,
+           nodes = c("Str.ctr_79","gender"), 
+           evidence = case_profile,
+           type = "conditional") %T>% {print(round(.,3))} %>% 
+  {list(Expected_Rating = round(t(.) %*% c(-3:2,0),2))}
+```
+
+
+```{r infer2a, eval=FALSE,include=FALSE}
+# Conditional ratings distribution given gender,
+# posterior given a doctor who has seen the movie.
+# First, show occurrences:
+df %>% 
+  filter(
+    str_detect(occupation,"doctor"),
+    str_detect(Has_Seen,"yes"),
+    str_detect(age, "yrs_33_44")
+  ) %$% 
+  table(Str.ctr_79,gender) %>% 
+  {list(`OCCURRENCES: `= .)}
+
+case_profile <- list(occupation="doctor", Has_Seen = "yes", age = "yrs_33_44")
+querygrain(bbn,
+           nodes = c("Str.ctr_79","gender"), 
+           evidence = case_profile,
+           type = "conditional") %T>% {print(round(.,3))} %>% 
+  {list(Expected_Rating = round(t(.) %*% c(-3:2,0),2))}
+```
+
+```{r infer2b, eval=FALSE,include=FALSE}
+querygrain(bbn_hierMD,
+           nodes = c("Str.ctr_79","gender"), 
+           evidence = case_profile,
+           type = "conditional") %T>% {print(round(.,3))} %>% 
+  {list(Expected_Rating = round(t(.) %*% c(-3:2,0),2))}
+```
+
+```{r infer2c, eval=FALSE,include=FALSE}
+querygrain(bbn_hierMDmix,
+           nodes = c("Str.ctr_79","gender"), 
+           evidence = case_profile,
+           type = "conditional") %T>% {print(round(.,3))} %>%
+  {list(Expected_Rating = round(t(.) %*% c(-3:2,0),2))}
+```
+
+## Impact on Generalized Bayes Factor, GBF(H:E)
+
+The Generalized Bayes Factor, GBF(H:E), has been shown to be a good metric for hypothesis (H) confirmation given evidence (E) and for use in generating relevant explanations (a ranked list of H's) of observed evidence (E). However, it is very sensitive to noisy estimates of prior and posterior probabilities for sparsely measured cases.
+
+Given that the `hierMD` and `hierMDmix` approaches both spread probability mass throughout the sparse CPTs that is more consistent with the population-level distributions, we would expect the GBF(H:E) for cases of either sparsely measured hypotheses H or evidence E to be less noisy, though somewhat biased due to the shrinkage towards the population marginal distributions that these priors induce.
+
+```{r gbf1a, eval=COMPUTATION}
+# IMPACT ON GENERALIZED BAYES FACTOR
+# Compare models impact on GBF(H:E) under different case profiles as
+# the "hypothesis" H, given the "evidence" E = LIKE = "yes".
+list( BDeu = bbn, hierMD = bbn_hierMD, hierMDmix = bbn_hierMDmix ) %>%
+  imap_dfr(
+    ~ gbf(bbn = .x, gndr = "F", occ = "doctor", age = "yrs_33_44") %$% 
+      map(at_cond,signif,3) %>%
+      as_tibble() %>% 
+      mutate(model=.y) %>% 
+      select(model,everything())
+  )
+```
+
+```{r gbf1b, eval=COMPUTATION}
+list( BDeu = bbn, hierMD = bbn_hierMD, hierMDmix = bbn_hierMDmix ) %>%
+  imap_dfr(
+    ~ gbf(bbn = .x, gndr = "M", occ = "programmer", age = "yrs_33_44") %$% 
+      map(at_cond,signif,3) %>%
+      as_tibble() %>% 
+      mutate(model=.y) %>% 
+      select(model,everything())
+  )
+```
+
+```{r gbf1c, eval=COMPUTATION}
+list( BDeu = bbn, hierMD = bbn_hierMD, hierMDmix = bbn_hierMDmix ) %>%
+  imap_dfr(
+    ~ gbf(bbn = .x, gndr = "F", occ = "programmer", age = "yrs_33_44") %$% 
+      map(at_cond,signif,3) %>%
+      as_tibble() %>% 
+      mutate(model=.y) %>% 
+      select(model,everything())
+  )
+```
+
+```{r gbf1d, eval=COMPUTATION}
+list( BDeu = bbn, hierMD = bbn_hierMD, hierMDmix = bbn_hierMDmix ) %>%
+  imap_dfr(
+    ~ gbf(bbn= .x, gndr = "F", occ = "administrator", age = "yrs_33_44") %$% 
+      map(at_cond,signif,3) %>%
+      as_tibble() %>% 
+      mutate(model=.y) %>% 
+      select(model,everything())
+  )
+```
+
+## Thoughts
+
+Of course, much more work would be needed to show if and when the `hierMDmix` method adds value over that of the `hierMD` method. But, *ACZ* have already shown the value of `hierMD` over traditional smoothing calculation of Bayesian network CPTs.
+
+It is nice to see that either of these approaches is so easily implemented using **Stan**. Moreover, *ACZ* provide **R** & **Stan** source code (under the GPLv3 license) -- ["Hierarchical BN parameter estimation"](https://ipg.idsia.ch/software.php?id=139) -- to perform the variational Bayesian inference for `hierMD` both with and without using **Stan**.
+
+Finally, having the full posterior (approximately) of the CPT parameters is a nice feature of these two methods. In the future, one should exploit this by reporting or visualizing the uncertainty quantification in risk assessment and decision analysis.
+
+## About
+
+-Michael L. Thompson,
+
+[*LinkedIn profile*](https://www.linkedin.com/in/mlthomps)
+
+## LICENSE
+
+This **R** Markdown file, `"hierMD_test2.Rmd"` and the two **Stan** files it uses, `"hierMD_MLT.stan"` and `"hierMDmix_MLT2.stan"`, are released under the terms of [the GPLv3 license](https://www.gnu.org/licenses/gpl.txt):
+
+>     This program is free software: you can redistribute it and/or modify
+>    it under the terms of the GNU General Public License as published by
+>    the Free Software Foundation, either version 3 of the License, or
+>    (at your option) any later version.
+>
+>    This program is distributed in the hope that it will be useful,
+>    but WITHOUT ANY WARRANTY; without even the implied warranty of
+>    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>    GNU General Public License for more details.
+>
+>    You should have received a copy of the GNU General Public License
+>    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+
+## References
