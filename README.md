@@ -1,9 +1,13 @@
 # BBN_hierMD
 
 Copyright (C) 2020, Michael L. Thompson
+
 Contact via LinkedIn: [www.linkedin.com/in/mlthomps](https://www.linkedin.com/in/mlthomps)
 
+
 See document ["hierMD_test2.pdf"](https://github.com/apollostream/BBN_hierMD/blob/main/hierMD_test2.pdf) for an explanation and example use of the code in this repository.
+
+
 
 ## GPLv3 LICENSE notice:
 
