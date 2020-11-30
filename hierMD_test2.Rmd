@@ -277,6 +277,9 @@ We'll use a BBN that I've generated before. The network is one of many in an ens
 
 The particular BBN shown here predicts the viewer's rating for the movie "Star Trek: The Motion Picture" (1979) given any combination of viewer features -- age, gender, or occupation -- movie genre, and ratings of other movies. (It was based on 694 observations in the smallest version of the [MovieLens dataset](https://grouplens.org/datasets/movielens/) [@harper2015movielens].)
 
+We use **R** packages `gRain` for Bayesian network inference (in particular, the `gRain::querygrain()` function) [@hojsgaard2012] and `bnlearn` for plotting the BBN (function `bnlearn::graphviz.plot()`) [@scutari2010].
+
+
 ```{r loadbbn, results='hide'}
 # Get a BBN to experiment with.
 # Use it to simulate data, too.
@@ -370,13 +373,13 @@ bbn <- bbn_new
 
 ## Code in the **Stan** Probabilistic Programming Language
 
-We use package `rstan`, based upon the **Stan** probabilistic programming language. Here, we show the programs, one each for the hierarchical Multinomial Dirichlet approach of *ACZ*, and the mixture variant that I propose. The code below shows how straight-forward it is to implement these approaches in **Stan**. The `hierMD` code is less than 25 lines!
+We use package `rstan`, based upon the **Stan** probabilistic programming language [@rstan2020]. Here, we show the programs, one each for the hierarchical Multinomial Dirichlet approach of *ACZ*, and the mixture variant that I propose. The code below shows how straight-forward it is to implement these approaches in **Stan**. The `hierMD` code is less than 25 lines!
 
 (Although it is possible to have `knitr` execute the code compilation directly from the **Stan** code chunks, we'll forego that and compile the programs from their respective files on disk in a later **R** code chunk.)
 
 ### `hierMD` **Stan** Program
 
-This first **Stan** program is adapted from the original by *ACZ* (under the GPLv3 license) -- see ["Hierarchical BN parameter estimation"](https://ipg.idsia.ch/software.php?id=139). Here, I've copied the code from my file `hierMD_MLT.stan` without its banner comments acknowledging Azzimonti *et al.* and stating the license terms -- see my **Stan** files `hierMD_MLT.stan` and `hierMDmix_MLT.stan` for the full banners including the GPLv3 license statement.
+This first **Stan** program is adapted from the original by *ACZ* (under the GPLv3 license) -- see ["Hierarchical BN parameter estimation"](https://ipg.idsia.ch/software.php?id=139). Here, I've copied the code from my file `hierMD_MLT.stan` without its banner comments acknowledging Azzimonti *et al.* and stating the license terms -- see my **Stan** files `hierMD_MLT.stan` and `hierMDmix_MLT2.stan` for the full banners including the GPLv3 license statement.
 
 This version of *ACZ*'s approach adds a proper likelihood statement and puts a prior on the magnitude of the Dirichlet parameter, `N_prior`, which in the original code was a fixed input value `s`. I've also dropped the estimation of the posterior of the marginal probability distribution parameters for the parent states (`thetaY` in the original *ACZ* code).
 
