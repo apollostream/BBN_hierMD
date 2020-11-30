@@ -31,32 +31,30 @@ This is a brief experiment with Hierarchical Multinomial-Dirichlet priors for Co
 
 I demonstrate the following two approaches:
 
-1.  **`hierMD`** -- The base case proposed by L. Azzimonti, G. Corani, and M. Zaffalon (*ACZ*) of [Imprecise Probability Group \@ IDSIA](https://ipg.idsia.ch/) [@AZZIMONTI201967]. \
-2.  **`hierMDmix`** -- A mixture model of parent states that I've proposed.    
-   + (**Note:** Originally, I'd posed the mixture on the Dirichlet parameter vectors. But now, I pose the mixture on conditional probability table columns -- see the math below.  Haven't done enough testing to determine which is better, but the current choice seems more reasonable. )
+1.  **`hierMD`** -- The base case proposed by L. Azzimonti, G. Corani, and M. Zaffalon (*ACZ*) of [Imprecise Probability Group \@ IDSIA](https://ipg.idsia.ch/) [@AZZIMONTI201967].\
+2.  **`hierMDmix`** -- A mixture model of parent states that I've proposed.\
+
+-   (**Note:** Originally, I'd posed the mixture on the Dirichlet parameter vectors. But now, I pose the mixture on conditional probability table columns -- see the math below. Haven't done enough testing to determine which is better, but the current choice seems more reasonable. )
 
 **My Conclusions** (w/out having done any other testing than what's shown below):
 
--   It's unclear whether the more complicated mixture model gives Bayesian inference results that are much different than those of the *ACZ* model.    
--   In the resulting inferences for sparse data cases, both approaches are an improvement over a flat prior -- the traditional `BDeu` (*Bayesian Dirichlet equivalent uniform* or *Laplace smoothing*) approach, in that they yield conditional distributions that are closer to the child node's marginal distribution than are uniform distributions from `BDeu`. These less flat distributions often seem more plausible.    
+-   It's unclear whether the more complicated mixture model gives Bayesian inference results that are much different than those of the *ACZ* model.\
+-   In the resulting inferences for sparse data cases, both approaches are an improvement over a flat prior -- the traditional `BDeu` (*Bayesian Dirichlet equivalent uniform* or *Laplace smoothing*) approach, in that they yield conditional distributions that are closer to the child node's marginal distribution than are uniform distributions from `BDeu`. These less flat distributions often seem more plausible.\
 -   Given that both approaches are in the Multinomial-Dirichlet family of posterior distributions, it probably is fairly straight forward to approximate the expectation of the posteriors using analytical formulas, esp. for `hierMD`. Even for `hierMDmix`, I think the mixture component weights could be estimated in proportion to the Kullback-Leibler Divergence of each parent state's smoothed estimate of the conditional probability vector from that of the marginal distribution of the child node averaged over the parent states marginal distributions. Or some such Information-Theory-based weighting....
-
 
 ## Generative Models
 
 Let:
 
-* Each child node $X$, with $L_X$ states that are indexed $x_i = 1,\dots, L_X$, have $P \geq 1$ parent nodes $Y_1, ..., Y_P$.     
-* Each parent of $X$ be denoted $Y_j$ have $L_{Y_j}$ states that are indexed $y_j = 1, \dots, L_{Y_j}$.     
-* All possible combinations of the parent states be indexed by $y = 1, \dots, (L_{Y_i} \times \dots \times L_{Y_P})$.    
-* Additionally, the $L_X$ probability parameters that make up the conditional probability vector over the states of the child node given the $y$ combination of parent states is denoted by $\boldsymbol{\theta}_{X|Y=y}$.      
-* Similarly, the vector of data counts over the states of the child node given the $y$ combination of parent states is denoted by $\mathbf{n}_{X|Y=y}$.  
+-   Each child node $X$, with $L_X$ states that are indexed $x_i = 1,\dots, L_X$, have $P \geq 1$ parent nodes $Y_1, ..., Y_P$.\
+-   Each parent of $X$ be denoted $Y_j$ have $L_{Y_j}$ states that are indexed $y_j = 1, \dots, L_{Y_j}$.\
+-   All possible combinations of the parent states be indexed by $y = 1, \dots, (L_{Y_i} \times \dots \times L_{Y_P})$.\
+-   Additionally, the $L_X$ probability parameters that make up the conditional probability vector over the states of the child node given the $y$ combination of parent states is denoted by $\boldsymbol{\theta}_{X|Y=y}$.\
+-   Similarly, the vector of data counts over the states of the child node given the $y$ combination of parent states is denoted by $\mathbf{n}_{X|Y=y}$.
 
 Then, we have the following models.
 
-
 ### Hierarchical Multinomial-Dirichlet, `hierMD`
-
 
 $$
 \begin{aligned}
@@ -74,9 +72,7 @@ N_{X|Y=y} &= \sum_{i=1}^{L_X}{n_{X=x_i|Y=y}}
 \end{aligned}
 $$
 
-
 ### Hierarchical Multinomial-Dirichlet Mixture, `hierMDmix`
-
 
 $$
 \begin{aligned}
@@ -106,17 +102,15 @@ For both models, it is instructive to look at what the posterior distribution fo
 
 The `hierMD` model uses a population-level (or global) prior $\boldsymbol{\alpha}_y$ for child node $X$, which depending upon the strength of $s$ (the effective sample size of the prior), will tend towards the marginal distribution of counts for each state of $X$. That is, it will look like the proportions computed from each element of vector $\mathbf{n}_{X} \equiv \sum_{y=1}{\mathbf{n}_{X|Y=y}}$, with a bit of smoothing.
 
-On the other hand, the `hierMDmix` model uses a mixture of parent-state-level (or local) parameter vectors for child node $X$, which depending upon the strength of $s$, will tend to a $\mathbf{w}_X$-weighted mixture of the conditional distribution of counts for each state of $X$ given each state $y_j$ of each parent node $Y_j$. 
+On the other hand, the `hierMDmix` model uses a mixture of parent-state-level (or local) parameter vectors for child node $X$, which depending upon the strength of $s$, will tend to a $\mathbf{w}_X$-weighted mixture of the conditional distribution of counts for each state of $X$ given each state $y_j$ of each parent node $Y_j$.
 
 **Importantly**, for child nodes $X$ with a single parent ($P=1$), `hierMD` and `hierMDmix` give the same result for $\boldsymbol{\theta}_{X|Y=y}$. (For example, node `age` in the example problem below.)
 
-Below we look at a BBN for predicting the rating of a movie given the viewer features, movie features, and past ratings, then the child node `gender`  has two parent nodes, `movie_rating` (below denoted as `Str.ctr_79`) and `occupation`.  
+Below we look at a BBN for predicting the rating of a movie given the viewer features, movie features, and past ratings, then the child node `gender` has two parent nodes, `movie_rating` (below denoted as `Str.ctr_79`) and `occupation`.
 
-In a sparsely measured combo of parent states like lowest level of `movie_rating` and `occupation` of `"doctor"`, the `hierMD` model will estimate a posterior distribution over the `gender` states of `"F"` and `"M"` that looks like the overall population distribution -- in this BBN's dataset, that is about 29% and 71%, respectively -- but slightly smoothed by a uniform hyperprior. 
+In a sparsely measured combo of parent states like lowest level of `movie_rating` and `occupation` of `"doctor"`, the `hierMD` model will estimate a posterior distribution over the `gender` states of `"F"` and `"M"` that looks like the overall population distribution -- in this BBN's dataset, that is about 29% and 71%, respectively -- but slightly smoothed by a uniform hyperprior.
 
 On the other hand, the `hierMDmix` model will estimate a posterior over `gender` that is a $\mathbf{w}_X$-weighted mixture of the empirical conditional probability distributions (i.e., the data proportions) of `gender` given `movie_rating` at its lowest level and of `gender` given `occupation` equal `"doctor"`, each slightly smoothed with the population-level prior.
-
-
 
 ## Prepare the R Environment
 
@@ -342,9 +336,9 @@ df  <- bbn %>%
   as_tibble()
 ```
 
-Re-estimate the parameters of the BBN so they match this new dataset.
+Re-estimate the parameters of the BBN so they match this new dataset. (**R** code chunk hidden.)
 
-```{r updtbbn}
+```{r updtbbn,include=FALSE, eval=COMPUTATION}
 # Update the CPT parameters of the bbn
 # Note that the nodes `LIKE` and `Has_Seen` are deterministic (i.e., logical).
 cptl <- bbn$cptlist[setdiff(names(bbn$cptlist),"Str.ctr_79")] %>% 
@@ -564,9 +558,9 @@ The space is so high-dimensional, and we only have `N=1000` cases. So, most of t
 
 ### Visualization
 
-Let's contrast the methods by plots. Each set has a different number of data cases, $N$, from more to less to zero. (The code chunks for the latter two plots are hidden.)
+Let's contrast the methods by plots. Each set has a different number of data cases, $N$, from more to less to zero. (The code chunks for the plots are hidden.)
 
-```{r infer01, fig.width=8,fig.height=3.5, eval=COMPUTATION}
+```{r infer01, echo=FALSE, fig.width=8,fig.height=3.5, eval=COMPUTATION}
 qdf <- list(BDeu = bbn) %>% c(bbn_list) %>%
   imap_dfr(
     ~  {
@@ -580,7 +574,8 @@ qdf <- list(BDeu = bbn) %>% c(bbn_list) %>%
         pivot_longer(cols=-Rating,names_to="gender", values_to="pr") %>% 
         mutate(BBN = .y)
     }
-  )
+  ) %>% 
+  filter(str_detect(Rating,"unseen",negate = TRUE))
 qdf %>% {
   ggplot(.,aes(x=Rating,y=pr,fill=Rating)) + 
     geom_col() + 
@@ -616,7 +611,8 @@ qdf <- list(BDeu = bbn) %>%
         pivot_longer(cols=-Rating,names_to="gender", values_to="pr") %>% 
         mutate(BBN = .y)
     }
-  )
+  ) %>% 
+  filter(str_detect(Rating,"unseen",negate = TRUE))
 
 qdf %>% {
   ggplot(.,aes(x=Rating,y=pr,fill=Rating)) + 
@@ -657,7 +653,8 @@ qdf <- list(BDeu = bbn) %>%
         pivot_longer(cols=-Rating,names_to="gender", values_to="pr") %>% 
         mutate(BBN = .y)
     }
-  )
+  ) %>% 
+  filter(str_detect(Rating,"unseen",negate = TRUE))
 
 qdf %>% {
   ggplot(.,aes(x=Rating,y=pr,fill=Rating)) + 
@@ -681,7 +678,6 @@ qdf %>% {
 
 
 ```
-
 
 ```{r infer1a, eval=FALSE,include=FALSE}
 # IMPACT ON BAYESIAN INFERNCE
@@ -722,7 +718,6 @@ querygrain(bbn_hierMDmix,
   {list(Expected_Rating = round(t(.) %*% c(-3:2,0),2))}
 ```
 
-
 ```{r infer2a, eval=FALSE,include=FALSE}
 # Conditional ratings distribution given gender,
 # posterior given a doctor who has seen the movie.
@@ -762,7 +757,7 @@ querygrain(bbn_hierMDmix,
 
 ## Impact on Generalized Bayes Factor, GBF(H:E)
 
-The Generalized Bayes Factor, GBF(H:E), has been shown to be a good metric for hypothesis (H) confirmation given evidence (E) and for use in generating relevant explanations (a ranked list of H's) of observed evidence (E). However, it is very sensitive to noisy estimates of prior and posterior probabilities for sparsely measured cases.
+The Generalized Bayes Factor, GBF(H:E), has been shown to be a good metric for hypothesis (H) confirmation given evidence (E) [@fitelson2007], [@good1985weight] and for use in generating relevant explanations (a ranked list of H's) of observed evidence (E) [@yuan2011most]. However, it is very sensitive to noisy estimates of prior and posterior probabilities for sparsely measured cases.
 
 Given that the `hierMD` and `hierMDmix` approaches both spread probability mass throughout the sparse CPTs that is more consistent with the population-level distributions, we would expect the GBF(H:E) for cases of either sparsely measured hypotheses H or evidence E to be less noisy, though somewhat biased due to the shrinkage towards the population marginal distributions that these priors induce.
 
@@ -827,23 +822,20 @@ Finally, having the full posterior (approximately) of the CPT parameters is a ni
 
 [*LinkedIn profile*](https://www.linkedin.com/in/mlthomps)
 
+\newpage
+
 ## LICENSE
 
 This **R** Markdown file, `"hierMD_test2.Rmd"` and the two **Stan** files it uses, `"hierMD_MLT.stan"` and `"hierMDmix_MLT2.stan"`, are released under the terms of [the GPLv3 license](https://www.gnu.org/licenses/gpl.txt):
 
 >     This program is free software: you can redistribute it and/or modify
->    it under the terms of the GNU General Public License as published by
->    the Free Software Foundation, either version 3 of the License, or
->    (at your option) any later version.
 >
->    This program is distributed in the hope that it will be useful,
->    but WITHOUT ANY WARRANTY; without even the implied warranty of
->    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->    GNU General Public License for more details.
+> it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 >
->    You should have received a copy of the GNU General Public License
->    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+> This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+>
+> You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-
+\newpage
 
 ## References
