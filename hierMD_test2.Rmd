@@ -18,6 +18,7 @@ knitr::opts_chunk$set(
   echo = TRUE,
   warning = FALSE,
   message = FALSE,
+  error = FALSE,
   fig.width = 8,
   fig.height = 5
 )
@@ -278,7 +279,6 @@ We'll use a BBN that I've generated before. The network is one of many in an ens
 The particular BBN shown here predicts the viewer's rating for the movie "Star Trek: The Motion Picture" (1979) given any combination of viewer features -- age, gender, or occupation -- movie genre, and ratings of other movies. (It was based on 694 observations in the smallest version of the [MovieLens dataset](https://grouplens.org/datasets/movielens/) [@harper2015movielens].)
 
 We use **R** packages `gRain` for Bayesian network inference (in particular, the `gRain::querygrain()` function) [@hojsgaard2012] and `bnlearn` for plotting the BBN (function `bnlearn::graphviz.plot()`) [@scutari2010].
-
 
 ```{r loadbbn, results='hide'}
 # Get a BBN to experiment with.
@@ -829,17 +829,21 @@ Finally, having the full posterior (approximately) of the CPT parameters is a ni
 
 \newpage
 
-## LICENSE
+## LICENSE NOTICE
 
 This **R** Markdown file, `"hierMD_test2.Rmd"` and the two **Stan** files it uses, `"hierMD_MLT.stan"` and `"hierMDmix_MLT2.stan"`, are released under the terms of [the GPLv3 license](https://www.gnu.org/licenses/gpl.txt):
 
 >     This program is free software: you can redistribute it and/or modify
+>     it under the terms of the GNU General Public License as published by the 
+>     Free Software Foundation, either version 3 of the License, or (at your option) 
+>     any later version.
 >
-> it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+>     This program is distributed in the hope that it will be useful, but WITHOUT 
+>     ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+>     FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 >
-> This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
->
-> You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.
+>     You should have received a copy of the GNU General Public License along with
+>     this program. If not, see <https://www.gnu.org/licenses/>.
 
 \newpage
 
